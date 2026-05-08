@@ -1,0 +1,4 @@
+numpy<2
+psutil>=5.9,<7
+opencv-python>=4.9,<4.11
+mediapipe==0.10.18

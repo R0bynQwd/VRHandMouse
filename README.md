@@ -6,24 +6,52 @@
 
 Aplicația este gândită pentru rulare locală, cu interfață minimă, calibrare fullscreen, icon în **system tray** și mod de lucru orientat către utilizare practică, fără a depinde de o instalare separată de Python pentru varianta distribuită.
 
+![Logo VRHandMouse](icon.png)
+
+## Prezentare vizuală
+
+```mermaid
+flowchart LR
+    A[Camera web] --> B[MediaPipe Hands]
+    B --> C[Detectare gesturi]
+    C --> D[Cursor & click]
+    C --> E[Scroll]
+    C --> F[3D / Zoom]
+    C --> G[Tray control]
+```
+
+```mermaid
+flowchart TD
+    A[Pornire aplicație] --> B[Calibrare fullscreen]
+    B --> C[Fereastră ghid gesturi]
+    C --> D[Emulare dezactivată]
+    D --> E[Triunghi]
+    E --> F[Emulare activă]
+```
+
 ## Funcționalități principale
 
-- calibrare fullscreen cu ținte în colțuri și centru;
-- control cursor prin poziția degetului arătător;
-- click stânga, dublu-click și drag;
-- click dreapta;
-- activare / dezactivare emulare prin gest de **triunghi**;
-- scroll prin gest dedicat;
-- mod **3D / zoom** prin gest dedicat cu două mâini;
-- ghid vizual de gesturi după calibrare;
-- icon în tray cu:
-  - stare emulare;
-  - activare / dezactivare cameră;
-  - închidere aplicație;
-- protecție de **instanță unică**;
-- pachet distribuit sub formă de executabil SFX.
+- 🎯 calibrare fullscreen cu ținte în colțuri și centru;
+- 🖱️ control cursor prin poziția degetului arătător;
+- 👆 click stânga, dublu-click și drag;
+- 👉 click dreapta;
+- 🔺 activare / dezactivare emulare prin gest de **triunghi**;
+- ↕️ scroll prin gest dedicat;
+- 🧩 mod **3D / zoom** prin gest dedicat cu două mâini;
+- 🪟 ghid vizual de gesturi după calibrare;
+- 📌 icon în tray cu stare, cameră și închidere;
+- 🔒 protecție de **instanță unică**;
+- 📦 pachet distribuit sub formă de executabil SFX.
 
 ## Gesturi
+
+| Pictogramă | Gest | Acțiune |
+| --- | --- | --- |
+| 🔺 | triunghi cu ambele mâini | activare / dezactivare emulare |
+| 👆 | mare + arătător | click / drag |
+| 👉 | mare + deget mic dreapta | click dreapta |
+| ↕️ | mare + mijlociu dreapta | scroll |
+| 🧩 | mare + inelar pe ambele mâini | mod 3D / zoom |
 
 ### În calibrare
 
@@ -70,6 +98,7 @@ Acest script verifică mediul local, dependențele și pornește `vision_tracker
 - `vision_tracker.py` - aplicația principală de tracking și control gestual
 - `vr_tools.bat` - launcher local pentru dezvoltare
 - `icon.ico` / `icon.png` - resurse grafice
+- `screen-metrics/` - utilitar auxiliar pentru măsurători de ecran
 - `dist\` - artefacte generate pentru distribuție
 
 ## Observații
