@@ -22,12 +22,24 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    A[Pornire aplicație] --> B[Calibrare fullscreen]
-    B --> C[Fereastră ghid gesturi]
-    C --> D[Emulare dezactivată]
-    D --> E[Triunghi]
-    E --> F[Emulare activă]
+    A[Pornire aplicație] --> B{Cameră detectată?}
+    B -- Nu --> C[Mesaj clar]
+    C --> D[Închidere completă]
+    B -- Da --> E{Acces la cameră permis?}
+    E -- Nu --> F[Mesaj pentru permisiuni]
+    F --> D
+    E -- Da --> G[Calibrare fullscreen]
+    G --> H[Fereastră ghid gesturi]
+    H --> I[Emulare dezactivată]
+    I --> J[Triunghi]
+    J --> K[Emulare activă]
 ```
+
+| Pornire | Calibrare | Control |
+| --- | --- | --- |
+| 📷 detectare cameră | 🎯 5 puncte fullscreen | 🖱️ mișcare cursor |
+| 🔐 verificare acces | 🪟 ghid vizual gesturi | 👆 click / drag stabilizat |
+| ❌ mesaj + închidere la eșec | ✅ intrare în modul de lucru | 📌 tray pentru cameră și EXIT |
 
 ## Funcționalități principale
 
@@ -41,6 +53,7 @@ flowchart TD
 - 🪟 ghid vizual de gesturi după calibrare;
 - 📌 icon în tray cu stare, cameră și închidere;
 - 📷 verificare la lansare pentru existența camerei și accesul la ea, cu închidere clară dacă lipsesc;
+- 🎯 click și dublu-click cu poziție înghețată la intenția de pinch, ca să nu mai fugă cursorul;
 - 🔒 protecție de **instanță unică**;
 - 📦 pachet distribuit sub formă de executabil SFX.
 
@@ -91,6 +104,14 @@ vr_tools.bat
 Acest script verifică mediul local, dependențele și pornește `vision_tracker.py`.
 La lansare, aplicația verifică mai întâi dacă există o cameră web detectată și dacă are acces real la ea.
 
+### Verificări inițiale la pornire
+
+1. detectează dacă sistemul vede o cameră disponibilă;
+2. încearcă acces real la cameră pentru a declanșa și verificarea de permisiuni;
+3. dacă nu există cameră, afișează mesaj și se închide complet;
+4. dacă există cameră, dar accesul este blocat, afișează mesaj dedicat și se închide complet;
+5. doar după aceste verificări intră în calibrare.
+
 ## Executabil distribuit
 
 În proiect există și o variantă distribuită ca executabil SFX, construită din folderul `dist\VRHandController`, astfel încât utilizatorul final să poată porni aplicația fără instalare separată de Python.
@@ -107,5 +128,6 @@ La lansare, aplicația verifică mai întâi dacă există o cameră web detecta
 
 - aplicația este optimizată pentru un flux de lucru Windows;
 - la pornire, lipsa camerei sau blocarea accesului este semnalată explicit înainte de intrarea în calibrare;
+- pinch-ul scurt pentru click menține cursorul fix până la decizia click / dublu-click / drag;
 - în lipsa camerei sau la erori de acces, controlul se poate gestiona din tray;
 - pentru distribuție se recomandă utilizarea executabilului SFX generat.
