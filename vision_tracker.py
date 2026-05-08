@@ -1816,7 +1816,7 @@ def main():
                     status_text = "Scroll incheiat."
                 else:
                     if scroll_reference_y is not None:
-                        scroll_residual += scroll_reference_y - right_hand.wrist[1]
+                        scroll_residual += right_hand.wrist[1] - scroll_reference_y
                         scroll_steps = 0
                         while scroll_residual >= SCROLL_TRIGGER_DELTA:
                             scroll_steps += 1

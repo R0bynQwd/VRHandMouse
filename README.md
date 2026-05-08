@@ -78,7 +78,7 @@ flowchart TD
 - **Activare / dezactivare emulare:** triunghi cu ambele mâini
 - **Click stânga / drag:** **deget mare + arătător**
 - **Click dreapta:** **deget mare + deget mic** pe mâna dreaptă
-- **Scroll:** **deget mare + deget mijlociu** pe mâna dreaptă
+- **Scroll:** **deget mare + deget mijlociu** pe mâna dreaptă, cu sens inversat față de implementarea anterioară
 - **Mod 3D / zoom:** **deget mare + inelar** pe ambele mâini
 
 ## Cerințe
