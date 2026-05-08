@@ -40,6 +40,7 @@ flowchart TD
 - 🧩 mod **3D / zoom** prin gest dedicat cu două mâini;
 - 🪟 ghid vizual de gesturi după calibrare;
 - 📌 icon în tray cu stare, cameră și închidere;
+- 📷 verificare la lansare pentru existența camerei și accesul la ea, cu închidere clară dacă lipsesc;
 - 🔒 protecție de **instanță unică**;
 - 📦 pachet distribuit sub formă de executabil SFX.
 
@@ -88,6 +89,7 @@ vr_tools.bat
 ```
 
 Acest script verifică mediul local, dependențele și pornește `vision_tracker.py`.
+La lansare, aplicația verifică mai întâi dacă există o cameră web detectată și dacă are acces real la ea.
 
 ## Executabil distribuit
 
@@ -104,5 +106,6 @@ Acest script verifică mediul local, dependențele și pornește `vision_tracker
 ## Observații
 
 - aplicația este optimizată pentru un flux de lucru Windows;
+- la pornire, lipsa camerei sau blocarea accesului este semnalată explicit înainte de intrarea în calibrare;
 - în lipsa camerei sau la erori de acces, controlul se poate gestiona din tray;
 - pentru distribuție se recomandă utilizarea executabilului SFX generat.

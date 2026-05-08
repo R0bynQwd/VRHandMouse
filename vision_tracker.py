@@ -4,6 +4,7 @@ import ctypes
 import ctypes.wintypes as wintypes
 import math
 import signal
+import subprocess
 import sys
 import time
 import tkinter as tk
@@ -59,6 +60,7 @@ MF_GRAYED = 0x00000001
 TPM_RETURNCMD = 0x0100
 TPM_NONOTIFY = 0x0080
 MB_ICONWARNING = 0x00000030
+MB_ICONERROR = 0x00000010
 VK_ESCAPE = 0x1B
 VK_CONTROL = 0x11
 VK_SHIFT = 0x10
@@ -189,6 +191,85 @@ def acquire_single_instance_mutex():
     if not mutex_handle:
         return None, False
     return mutex_handle, ctypes.get_last_error() != ERROR_ALREADY_EXISTS
+
+
+def show_startup_message(message, flags=MB_ICONWARNING):
+    print(message)
+    user32.MessageBoxW(None, message, WINDOW_TITLE, flags)
+
+
+def list_camera_devices():
+    powershell_script = (
+        "$devices = Get-CimInstance Win32_PnPEntity | "
+        "Where-Object { $_.PNPClass -in @('Camera','Image') -or $_.Service -eq 'usbvideo' } | "
+        "Select-Object -ExpandProperty Name; "
+        "if ($devices) { $devices | ForEach-Object { $_ } }"
+    )
+    try:
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", powershell_script],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except Exception:
+        return []
+
+    if result.returncode != 0:
+        return []
+
+    devices = []
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if line and line not in devices:
+            devices.append(line)
+    return devices
+
+
+def try_open_camera(camera_index=0):
+    backends = [cv2.CAP_MSMF, cv2.CAP_DSHOW, None]
+    for backend in backends:
+        capture = cv2.VideoCapture(camera_index) if backend is None else cv2.VideoCapture(camera_index, backend)
+        if not capture.isOpened():
+            capture.release()
+            continue
+
+        capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        for _ in range(6):
+            success, frame = capture.read()
+            if success and frame is not None:
+                return capture
+            time.sleep(0.15)
+        capture.release()
+    return None
+
+
+def open_first_available_camera(max_index=4):
+    for camera_index in range(max_index):
+        capture = try_open_camera(camera_index)
+        if capture is not None:
+            return capture
+    return None
+
+
+def verify_startup_camera():
+    devices = list_camera_devices()
+    if not devices:
+        return None, "missing", "Nu a fost detectata nicio camera web. Aplicatia se va inchide."
+
+    capture = open_first_available_camera()
+    if capture is not None:
+        return capture, "ok", None
+
+    primary_device = devices[0]
+    return (
+        None,
+        "denied",
+        f"Camera a fost detectata ({primary_device}), dar aplicatia nu are acces la ea. "
+        "Permite accesul la camera in Windows si relanseaza aplicatia.",
+    )
 
 
 def set_left_button(is_down):
@@ -1223,6 +1304,13 @@ def main():
         return
     runtime_context.instance_mutex = instance_mutex
     runtime_context.preview_enabled = args.debug_preview
+
+    cap, startup_camera_status, startup_camera_message = verify_startup_camera()
+    if startup_camera_status != "ok":
+        show_startup_message(startup_camera_message, MB_ICONERROR)
+        runtime_context.cleanup()
+        return
+
     tray_manager = TrayIconManager(runtime_root())
     runtime_context.tray_manager = tray_manager
     register_cleanup_handlers(runtime_context)
@@ -1240,20 +1328,6 @@ def main():
         min_detection_confidence=0.55,
         min_tracking_confidence=0.55,
     )
-
-    def open_camera():
-        capture = cv2.VideoCapture(0)
-        capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        if capture.isOpened():
-            return capture
-        capture.release()
-        return None
-
-    cap = open_camera()
-    if cap is None:
-        print("Eroare: Nu s-a putut accesa camera web.")
-        return
 
     camera_enabled = True
     emulation_enabled = False
@@ -1273,6 +1347,7 @@ def main():
     pinch_active = False
     pinch_started_at = 0.0
     pinch_anchor_cursor = (smooth_x, smooth_y)
+    pinch_anchor_tip = (0.0, 0.0)
     last_tap_time = 0.0
     zoom_reference = None
     zoom_residual = 0.0
@@ -1337,7 +1412,7 @@ def main():
         nonlocal prev_slot_positions, zoom_reference, zoom_residual, rotation_reference
         nonlocal rotation_residual, scroll_reference_y, scroll_residual, pinch_active
         nonlocal right_click_ready, two_hand_seen_at, last_visible_count, smooth_x, smooth_y
-        nonlocal calibration_click_ready, calibration_click_cooldown_until
+        nonlocal calibration_click_ready, calibration_click_cooldown_until, pinch_anchor_tip
 
         prev_slot_positions = {}
         zoom_reference = None
@@ -1347,6 +1422,7 @@ def main():
         scroll_reference_y = None
         scroll_residual = 0.0
         pinch_active = False
+        pinch_anchor_tip = (0.0, 0.0)
         right_click_ready = True
         two_hand_seen_at = None
         last_visible_count = 0
@@ -1390,10 +1466,17 @@ def main():
                 if camera_enabled:
                     disable_camera_runtime("Camera dezactivata din tray.", "Camera dezactivata.")
                 else:
-                    reopened_cap = open_camera()
-                    if reopened_cap is None:
-                        tray_manager.show_balloon("VR Hand Controller", "Nu am putut reactiva camera.")
+                    camera_devices = list_camera_devices()
+                    if not camera_devices:
+                        tray_manager.show_balloon("VR Hand Controller", "Nu a fost detectata nicio camera.")
                     else:
+                        reopened_cap = open_first_available_camera()
+                        if reopened_cap is None:
+                            tray_manager.show_balloon(
+                                "VR Hand Controller",
+                                "Camera a fost detectata, dar accesul este blocat. Permite accesul si incearca din nou.",
+                            )
+                            continue
                         cap = reopened_cap
                         camera_enabled = True
                         tray_manager.set_camera_enabled(True)
@@ -1415,7 +1498,7 @@ def main():
                     continue
 
             if cap is None or not cap.isOpened():
-                cap = open_camera()
+                cap = open_first_available_camera()
                 if cap is None:
                     disable_camera_runtime(
                         "Camera indisponibila. Reactiv-o din tray cand revine.",
@@ -1749,6 +1832,14 @@ def main():
             if not scroll_candidate:
                 scroll_enter_timer.reset()
 
+            suppress_single_hand = triangle_active or dual_grab_candidate or scroll_candidate or two_hand_lock
+            if current_mode != "drag" and not suppress_single_hand and not pinch_active and primary_hand.pinch_ratio <= PINCH_DOWN_RATIO:
+                pinch_active = True
+                pinch_started_at = now
+                pinch_anchor_cursor = (smooth_x, smooth_y)
+                pinch_anchor_tip = primary_hand.index_tip
+                status_text = "Pinch detectat: astept click sau drag."
+
             target_x = map_calibrated_to_screen(
                 primary_hand.index_tip[0],
                 screen_width - 1,
@@ -1764,6 +1855,8 @@ def main():
             if math.hypot(target_x - smooth_x, target_y - smooth_y) < CURSOR_DEADZONE and not pinch_active:
                 target_x = smooth_x
                 target_y = smooth_y
+            if pinch_active and current_mode != "drag" and not suppress_single_hand:
+                target_x, target_y = pinch_anchor_cursor
 
             smooth_x += (target_x - smooth_x) * MOVE_SMOOTHING
             smooth_y += (target_y - smooth_y) * MOVE_SMOOTHING
@@ -1772,7 +1865,6 @@ def main():
 
             set_mode("drag" if current_mode == "drag" else "cursor")
 
-            suppress_single_hand = triangle_active or dual_grab_candidate or scroll_candidate or two_hand_lock
             if current_mode == "drag":
                 if primary_hand.pinch_ratio > PINCH_DOWN_RATIO:
                     runtime_context.release_left_button()
@@ -1782,18 +1874,10 @@ def main():
                 else:
                     status_text = "Drag activ."
             elif not suppress_single_hand:
-                pinch_move_ratio = point_distance(
-                    (smooth_x / max(screen_width, 1), smooth_y / max(screen_height, 1)),
-                    (pinch_anchor_cursor[0] / max(screen_width, 1), pinch_anchor_cursor[1] / max(screen_height, 1)),
-                )
-                if not pinch_active and primary_hand.pinch_ratio <= PINCH_DOWN_RATIO:
-                    pinch_active = True
-                    pinch_started_at = now
-                    pinch_anchor_cursor = (smooth_x, smooth_y)
-                    status_text = "Pinch detectat: astept click sau drag."
-                elif pinch_active and primary_hand.pinch_ratio >= PINCH_UP_RATIO:
+                pinch_motion_ratio = point_distance(primary_hand.index_tip, pinch_anchor_tip) / max(primary_hand.hand_scale, 0.01)
+                if pinch_active and primary_hand.pinch_ratio >= PINCH_UP_RATIO:
                     held_time = now - pinch_started_at
-                    if held_time < PINCH_DRAG_SECONDS and pinch_move_ratio <= PINCH_TAP_MOVE_RATIO:
+                    if held_time < PINCH_DRAG_SECONDS and pinch_motion_ratio <= PINCH_TAP_MOVE_RATIO:
                         if now - last_tap_time <= DOUBLE_TAP_GAP:
                             click_left_button(double=True)
                             last_tap_time = 0.0
@@ -1805,7 +1889,7 @@ def main():
                     pinch_active = False
                 elif pinch_active:
                     held_time = now - pinch_started_at
-                    if held_time >= PINCH_DRAG_SECONDS or pinch_move_ratio >= PINCH_DRAG_MOVE_RATIO:
+                    if held_time >= PINCH_DRAG_SECONDS or pinch_motion_ratio >= PINCH_DRAG_MOVE_RATIO:
                         set_left_button(True)
                         runtime_context.left_button_down = True
                         set_mode("drag")
