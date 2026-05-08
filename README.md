@@ -39,7 +39,7 @@ flowchart TD
 | --- | --- | --- |
 | 📷 detectare cameră | 🎯 5 puncte fullscreen | 🖱️ mișcare cursor |
 | 🔐 verificare acces | 🪟 ghid vizual gesturi | 👆 click / drag stabilizat |
-| ❌ mesaj + închidere la eșec | ✅ intrare în modul de lucru | 📌 tray pentru cameră și EXIT |
+| ❌ mesaj + închidere la eșec | ✅ intrare în modul de lucru | 📌 tray pentru Help, cameră și EXIT |
 
 ## Funcționalități principale
 
@@ -51,7 +51,7 @@ flowchart TD
 - ↕️ scroll prin gest dedicat;
 - 🧩 mod **3D / zoom** prin gest dedicat cu două mâini;
 - 🪟 ghid vizual de gesturi după calibrare;
-- 📌 icon în tray cu stare, cameră și închidere;
+- 📌 icon în tray cu stare, **Help**, cameră și închidere;
 - 📷 verificare la lansare pentru existența camerei și accesul la ea, cu închidere clară dacă lipsesc;
 - 🎯 click și dublu-click cu poziție înghețată la intenția de pinch, ca să nu mai fugă cursorul;
 - 🔒 protecție de **instanță unică**;
@@ -116,6 +116,8 @@ La lansare, aplicația verifică mai întâi dacă există o cameră web detecta
 
 În proiect există și o variantă distribuită ca executabil SFX, construită din folderul `dist\VRHandController`, astfel încât utilizatorul final să poată porni aplicația fără instalare separată de Python.
 
+Executabilul principal include metadata de produs și versiune pentru identificare mai clară în Windows, iar buildul nu mai folosește UPX. Totuși, avertismentele SmartScreen nu pot fi eliminate complet fără semnare digitală.
+
 ## Structura proiectului
 
 - `vision_tracker.py` - aplicația principală de tracking și control gestual
@@ -129,5 +131,6 @@ La lansare, aplicația verifică mai întâi dacă există o cameră web detecta
 - aplicația este optimizată pentru un flux de lucru Windows;
 - la pornire, lipsa camerei sau blocarea accesului este semnalată explicit înainte de intrarea în calibrare;
 - pinch-ul scurt pentru click menține cursorul fix până la decizia click / dublu-click / drag;
+- meniul tray poate redeschide oricând ghidul de gesturi prin opțiunea **Help**;
 - în lipsa camerei sau la erori de acces, controlul se poate gestiona din tray;
 - pentru distribuție se recomandă utilizarea executabilului SFX generat.

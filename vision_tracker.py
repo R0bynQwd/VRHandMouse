@@ -425,6 +425,7 @@ kernel32_mutex.CreateMutexW.restype = wintypes.HANDLE
 class TrayIconManager:
     EXIT_COMMAND_ID = 1001
     CAMERA_COMMAND_ID = 1002
+    HELP_COMMAND_ID = 1003
 
     def __init__(self, root_dir):
         self.root_dir = Path(root_dir)
@@ -438,6 +439,7 @@ class TrayIconManager:
         self._wndproc = None
         self._exit_requested = threading.Event()
         self._camera_toggle_requested = threading.Event()
+        self._help_requested = threading.Event()
         self._state_lock = threading.Lock()
         self._camera_enabled = True
 
@@ -485,6 +487,7 @@ class TrayIconManager:
                 camera_enabled = self._camera_enabled
             camera_label = "Dezactiveaza camera" if camera_enabled else "Activeaza camera"
             user32.AppendMenuW(menu_handle, MF_STRING | MF_GRAYED, 0, "Fotache Vasile")
+            user32.AppendMenuW(menu_handle, MF_STRING, self.HELP_COMMAND_ID, "Help")
             user32.AppendMenuW(menu_handle, MF_STRING, self.CAMERA_COMMAND_ID, camera_label)
             user32.AppendMenuW(menu_handle, MF_STRING, self.EXIT_COMMAND_ID, "EXIT")
             cursor_pos = wintypes.POINT()
@@ -501,6 +504,8 @@ class TrayIconManager:
             )
             if command == self.EXIT_COMMAND_ID:
                 self._exit_requested.set()
+            elif command == self.HELP_COMMAND_ID:
+                self._help_requested.set()
             elif command == self.CAMERA_COMMAND_ID:
                 self._camera_toggle_requested.set()
         finally:
@@ -575,6 +580,12 @@ class TrayIconManager:
         self._camera_toggle_requested.clear()
         return True
 
+    def consume_help_request(self):
+        if not self._help_requested.is_set():
+            return False
+        self._help_requested.clear()
+        return True
+
     def set_camera_enabled(self, enabled):
         with self._state_lock:
             self._camera_enabled = enabled
@@ -599,6 +610,7 @@ class TrayIconManager:
     def stop(self):
         self._exit_requested.clear()
         self._camera_toggle_requested.clear()
+        self._help_requested.clear()
         if self.hwnd:
             user32.PostMessageW(self.hwnd, WM_CLOSE, 0, 0)
         if self._thread is not None:
@@ -948,6 +960,18 @@ class GestureGuideOverlay:
         close_button.pack(side="bottom", pady=(6, 16))
         self.root.update()
         self.root.focus_force()
+
+    def present(self):
+        if self.closed:
+            return
+        try:
+            self.root.deiconify()
+            self.root.lift()
+            self.root.attributes("-topmost", True)
+            self.root.focus_force()
+            self.root.update_idletasks()
+        except tk.TclError:
+            self.closed = True
 
     def _create_gesture_card(self, parent, title, description, draw_callback):
         card = tk.Frame(parent, bg="#111827", bd=1, relief="solid", padx=10, pady=8)
@@ -1407,6 +1431,8 @@ def main():
         nonlocal gesture_guide_overlay
         if gesture_guide_overlay is None:
             gesture_guide_overlay = GestureGuideOverlay(screen_width, screen_height)
+        else:
+            gesture_guide_overlay.present()
 
     def reset_runtime_state():
         nonlocal prev_slot_positions, zoom_reference, zoom_residual, rotation_reference
@@ -1485,6 +1511,11 @@ def main():
                         status_text = "Camera reactivata din tray."
                         print(status_text)
                         tray_manager.show_balloon("VR Hand Controller", "Camera activata.")
+
+            if runtime_context.tray_manager is not None and runtime_context.tray_manager.consume_help_request():
+                ensure_gesture_guide_overlay()
+                status_text = "Ghidul de gesturi a fost deschis din tray."
+                print(status_text)
 
             if not camera_enabled:
                 time.sleep(0.05)
